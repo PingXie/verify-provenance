@@ -73,9 +73,10 @@ runs:
           cp ".provenance-db/${{ inputs.pr_db_file }}" .refreshed_pr_db.json.gz
         else
           PR_NUMBER="${{ github.event.pull_request.number }}"
+          set +e
           python3 ${{ github.action_path }}/src/check.py             $PR_NUMBER             --source-repo "${{ inputs.source_repo }}"             --target-repo "${{ inputs.target_repo }}"             --branding-pairs "${{ inputs.branding_pairs }}" --prefix-pairs "${{ inputs.prefix_pairs }}"             --pr-db ".provenance-db/${{ inputs.pr_db_file }}"             --commit-db ".provenance-db/${{ inputs.commit_db_file }}"             --threshold "${{ inputs.threshold }}"             --verbose 2> .provenance-output.log
-
           EXIT_CODE=$?
+          set -e
           if [ $EXIT_CODE -eq 1 ] && grep -q "matches" .provenance-output.log; then
             echo "provenance_failed=true" >> $GITHUB_OUTPUT
             cat .provenance-output.log
@@ -90,13 +91,13 @@ runs:
         GITHUB_TOKEN: ${{ inputs.github_token }}
       run: |
         COMMENT="### ❌ Provenance Check Alert
-        
+
         Potential code similarities detected with upstream repository.
-        
+
         "
         MATCHES=$(grep "matches" .provenance-output.log | sed "s/^[0-9:-]* \[INFO\] //" | sed "s/^/ - /")
         COMMENT="${COMMENT}${MATCHES}
-        
+
         ---
         *This check was performed automatically by the Provenance Guard Action.*"
         REPO="${{ inputs.target_repo }}"
