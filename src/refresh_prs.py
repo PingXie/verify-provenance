@@ -36,28 +36,28 @@ def should_skip_pr(title, pr):
     if pr.get("changed_files", 0) > 50: return True
     return False
 
-def fetch_pr_list(owner, repo, state, page, per_page, token, since_created=None):
-    url = f"https://api.github.com/repos/{owner}/{repo}/pulls?state={state}&sort=created&direction=desc&per_page={per_page}&page={page}"
+def fetch_pr_list(owner, repo, state, page, per_page, token, since_updated=None):
+    url = f"https://api.github.com/repos/{owner}/{repo}/pulls?state={state}&sort=updated&direction=desc&per_page={per_page}&page={page}"
     headers = {"Accept": "application/vnd.github+json", "User-Agent": "Provenance-Guard"}
     if token: headers["Authorization"] = f"Bearer {token}"
     data, _ = github_request(url, headers)
     prs = json.loads(data.decode("utf-8"))
-    if since_created is None: return prs, not prs
-    since_ts = normalize_timestamp(since_created)
-    recent = [p for p in prs if normalize_timestamp(p.get("created_at", "")) > since_ts]
+    if since_updated is None: return prs, not prs
+    since_ts = normalize_timestamp(since_updated)
+    recent = [p for p in prs if normalize_timestamp(p.get("updated_at", "")) > since_ts]
     return recent, len(recent) < len(prs) or not prs
 
 def refresh_prs(args, config):
     token = os.environ.get("GITHUB_TOKEN")
     db = load_db(args.out_db)
     prs = db.get("prs", {})
-    since_created = max(p["created_at"] for p in prs.values()) if prs else args.cutoff_date
-    since_created = normalize_timestamp(since_created)
+    since_updated = max(p["updated_at"] for p in prs.values()) if prs else args.cutoff_date
+    since_updated = normalize_timestamp(since_updated)
 
     for state in ["open", "closed"]:
         page = 1
         while page <= MAX_PAGES:
-            pr_list, stop = fetch_pr_list(args.source_owner, args.source_repo_name, state, page, PER_PAGE, token, since_created)
+            pr_list, stop = fetch_pr_list(args.source_owner, args.source_repo_name, state, page, PER_PAGE, token, since_updated)
             if not pr_list: break
             for pr in pr_list:
                 pr_num = pr["number"]
